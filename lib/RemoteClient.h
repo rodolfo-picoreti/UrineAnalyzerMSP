@@ -1,0 +1,9 @@
+#ifndef LIB_REMOTECLIENT_H_
+#define LIB_REMOTECLIENT_H_
+
+typedef enum {
+	CLIENT_SERVICE_NEW_ADC_SAMPLE = 0x00,
+	CLIENT_SERVICE_TIME_SYNC = 0x01
+} Remote_Client_Service;
+
+#endif /* LIB_REMOTECLIENT_H_ */
