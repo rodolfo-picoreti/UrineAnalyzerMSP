@@ -25,7 +25,7 @@ Timer_A_PWMConfig PWM_pinConfig_2_5 = {
 	.clockSource = TIMER_A_CLOCKSOURCE_SMCLK,      	      // 48MHz
 	.clockSourceDivider = TIMER_A_CLOCKSOURCE_DIVIDER_16, // 3MHz
 	.timerPeriod = 300,		                              // 100us - 10kHz
-	.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2, // CCR3 of TIMER_A0 is pin 2.5
+	.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2, // CCR2 of TIMER_A0 is pin 2.5
 	.compareOutputMode = TIMER_A_OUTPUTMODE_RESET_SET,
 	.dutyCycle = 0
 };
@@ -35,19 +35,23 @@ Timer_A_PWMConfig PWM_pinConfig_2_4 = {
 	.clockSource = TIMER_A_CLOCKSOURCE_SMCLK,      	      // 48MHz
 	.clockSourceDivider = TIMER_A_CLOCKSOURCE_DIVIDER_16, // 3MHz
 	.timerPeriod = 300,		                              // 100us - 10kHz
-	.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1, // CCR3 of TIMER_A0 is pin 2.4
+	.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1, // CCR1 of TIMER_A0 is pin 2.4
 	.compareOutputMode = TIMER_A_OUTPUTMODE_RESET_SET,
 	.dutyCycle = 0
 };
 
-enum {
-	PWM_REAGENT_PUMP = 0,
-	PWM_SAMPLE_WASTE_PUMP = 1,
-	PWM_PREHEATER = 2,
-	PWM_INTHEATER = 3
-};
+uint32_t PWM_dutyCycleMax() {
+	return 301;
+}
 
-void PWM_setDutyCycle(uint8_t pin, uint32_t value) {
+typedef enum {
+	PWM_REAGENT_PUMP = 0,       // 2.5
+	PWM_SAMPLE_WASTE_PUMP = 1,  // 2.7
+	PWM_PREHEATER = 2,          // 2.6
+	PWM_INTHEATER = 3           // 2.4
+} PWM_id;
+
+void PWM_setDutyCycle(PWM_id pin, uint32_t value) {
 	switch (pin) {
 		case PWM_REAGENT_PUMP:
 			PWM_pinConfig_2_5.dutyCycle = value;

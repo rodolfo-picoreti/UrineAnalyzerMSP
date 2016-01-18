@@ -1,9 +1,26 @@
 #ifndef LIB_ADCOPTIONS_H_
 #define LIB_ADCOPTIONS_H_
 
+/*
+ * >> Options to control sampling behavior:
+ * 		
+ *		Sampling Time: This is not the actual sampling time, but the rate 
+ *					   that the RPI will receive samples in seconds. Real 
+ *					   sampling time is configured on "ADC.h" header.
+ *
+ *		Sampling Count: Stores how many samples have been collected since
+ *                      the last time sampling as enabled.
+ *
+ *		Sampling Enable: Controls if sampling data should be send to the 
+ *                       RPI (true) or not (false). 
+ *
+ * !!!! All the options are atomic in order to avoid race conditions between
+ *      different threads
+ */
+
 typedef struct {
 	atomic_bool samplingEnabled;
-	atomic_uint_least16_t samplingTime; // seconds
+	atomic_uint_least32_t samplingTime; // seconds
 	atomic_uint_least32_t sampleCount;
 } ADC_Options;
 
@@ -13,11 +30,11 @@ void ADC_Options_setup() {
 	atomic_store(&options.samplingEnabled, false);
 }
 
-void ADC_setSamplingTime(uint16_t ts) {
+void ADC_setSamplingTime(uint32_t ts) {
 	atomic_store(&options.samplingTime, ts);
 }
 
-uint16_t ADC_getSamplingTime() {
+uint32_t ADC_getSamplingTime() {
 	return atomic_load(&options.samplingTime);
 }
 

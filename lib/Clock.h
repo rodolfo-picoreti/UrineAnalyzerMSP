@@ -7,29 +7,36 @@
 #include <stdatomic.h>
 #include "driverlib.h"
 
-static uint64_t milliseconds;
+// Count how many seconds passed since system startup
+static atomic_uint_least32_t seconds;
+
+void Clock_increment() {
+	atomic_fetch_add_explicit(&seconds, 1, memory_order_relaxed);
+}
+
+uint32_t Clock_seconds() {
+	return atomic_load(&seconds);
+}
 
 Void Clock_swi(UArg arg0);
 
-uint64_t Clock_increment() {
-	++milliseconds;
-	return milliseconds;
-}
-uint64_t Clock_milliseconds() {
-	return milliseconds;
-}
-
+/*
+ * Create clock software interrupt other configuration parameters 
+ * can be found on the RTOS .cfg file
+ */
 void Clock_setup() {
-
-	GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN0);
-
     Error_Block eb;
     Error_init(&eb);
 
-    // Clock tick = 1s
+    /* 
+     * Clock tick = 1 millisecond 
+     *	 
+     *	!! This is defined on the .cfg file as "Clock.tickPeriod"
+     */
+
 	Clock_Params clkParams;
 	Clock_Params_init(&clkParams);
-	clkParams.period = 1; // Call swi every tick
+	clkParams.period = 1000; // Call SWI every 1000 tick, therefore every second
 	clkParams.startFlag = true;
 	Clock_create(Clock_swi, 1, &clkParams, &eb);
 }

@@ -7,12 +7,11 @@
 #include <ti/sysbios/knl/Mailbox.h>
 
 #include "ADCSample.h"
-#include "RemoteServerServices.h"
 
 // Send Samples collected on the ADC HWI to the UART Writer Task.
 Mailbox_Handle Mailbox_samples;
 
-// Send the result of Remote Calls to the UART Writer Task.
+// Send the result of Remote Calls (service responses) to the UART Writer Task.
 Mailbox_Handle Mailbox_buffers;
 
 // Synchorize read of the Sampling and Remote mailboxes on the UART Writer Task.
@@ -20,7 +19,7 @@ Event_Handle Event_uart;
 
 void Sync_postSample(ADC_Sample* sample) {
 	if (!Mailbox_post(Mailbox_samples, sample, BIOS_NO_WAIT)) {
-		// Mailbox is full! Raise flag!
+		// Mailbox is full! This should NEVER happen!
 		System_abort("Mailbox is full!");
 	}
 }
@@ -74,14 +73,14 @@ void Sync_setup() {
 
 	Mailbox_samples = Mailbox_create(sizeof(ADC_Sample), 16, &mailboxParams, &eb);
 	if (Mailbox_samples == NULL) {
-		System_abort("Fatal! Could not initialize adc mailbox");
+		System_abort("Fatal! Could not initialize samples mailbox");
 	}
 
 	mailboxParams.readerEventId = Event_Id_01;
 
 	Mailbox_buffers = Mailbox_create(sizeof(Buffer), 4, &mailboxParams, &eb);
 	if (Mailbox_buffers == NULL) {
-		System_abort("Fatal! Could not initialize rpc mailbox");
+		System_abort("Fatal! Could not initialize buffers mailbox");
 	}
 }
 

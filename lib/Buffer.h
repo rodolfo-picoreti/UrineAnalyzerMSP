@@ -3,6 +3,8 @@
 
 #include <xdc/std.h>
 
+// Used to compose packets and to serialize/deserialize data
+
 typedef struct {
 	char* data;
 	size_t size;

@@ -1,29 +1,14 @@
-
 #ifndef LIB_PID_H_
 #define LIB_PID_H_
 
+/*
 typedef struct {
 	float setpoint;
 	float error[3]; // past 3 error values
 	float K[3]; // controller gain
 	float out;
-	float outMax;
-	float outMin;
 } PID;
 
-atomic_bool PID_mode; // 0 - manual, 1 - automatic
-
-void PID_setMode(bool mode) {
-	atomic_store(&PID_mode, mode);
-}
-
-bool PID_getMode() {
-	return atomic_load(&PID_mode);
-}
-
-void PID_setup() {
-	PID_setMode(true); // auto mode
-}
 
 void PID_initialize(PID* pid, float kp, float ki, float kd) {
 	pid->K[0] = kp + ki + kd;
@@ -57,5 +42,5 @@ float PID_compute(PID* pid, float input) {
 }
 
 
-
+*/
 #endif /* LIB_PID_H_ */

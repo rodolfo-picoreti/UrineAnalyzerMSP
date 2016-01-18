@@ -18,109 +18,102 @@
 /* Board Header file */
 #include "Board.h"
 
-/* Others */
+/* Urine Analyzer Header files */
 #include "lib/UART0.h"
 #include "lib/Clock.h"
 #include "lib/ADC.h"
 #include "lib/Sync.h"
 #include "lib/PWM.h"
-#include "lib/RemoteParsers.h"
-#include "lib/RemoteClientServices.h"
+#include "lib/ServiceParsers.h"
+#include "lib/ServiceRpiMethods.h"
 #include "lib/Valves.h"
-#include "lib/PID.h"
+#include "lib/Controller.h"
+#include "lib/ServiceLock.h"
 
 Void Clock_swi(UArg arg0) {
-	uint64_t microseconds = Clock_increment();
+	// Clock debug led (every second)
+	GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN0);
+	Clock_increment();
 
-	if (!(microseconds % 1000)) {
-		GPIO_toggleOutputOnPin(GPIO_PORT_P2, GPIO_PIN0);
-	}
-
-	if (ADC_samplingEnabled() && !(microseconds % ADC_getSamplingTime())) {
-		ADC_Sample sample;
-		ADC_Sample_initialize(&sample);
-		sample.counter = ADC_getCounter();
-		sample.timestamp = microseconds;
-		Sync_postSample(&sample);
-		ADC_incrementCounter();
+	static uint32_t lastSample = 0;
+	uint32_t seconds = Clock_seconds();
+	if (ADC_samplingEnabled()) {
+		if (seconds - lastSample >= ADC_getSamplingTime()) {
+			lastSample = seconds;
+			Swi_post(adcSwi);
+		}
 	}
 }
 
-float smooth(uint16_t current, uint16_t past) {
-	return 0.1*current + 0.9*past;
+Void ADC_swi(UArg arg0, UArg arg1) {
+	// Compose sample packet
+	ADC_Sample sample;
+	ADC_Sample_initialize(&sample);
+	ADC_incrementCounter();
+
+	// Send it to Task_uartWriter
+	Sync_postSample(&sample);
 }
 
 Void ADC_hwi() {
 	/*
 	 * A11 -> P4.2 -> SD2
-	 * A12 -> P4.1 -> Heater
+	 * A12 -> P4.1 -> Pre Heater
 	 * A13 -> P4.0 -> SD1
 	 * A14 -> P6.1 -> Box
-	 * A15 -> P6.0 -> Pre heater
+	 * A15 -> P6.0 -> heater
 	 */
 	uint64_t status = ADC14_getEnabledInterruptStatus();
 	ADC14_clearInterruptFlag(status);
 
 	if (ADC_INT15 & status) {
-		ADC_Sensor_Id id = ADC_getCurrentSensorId();
-		ADC_storeReading(id, smooth(ADC14MEM14, ADC_loadReading(id)));
+		ADC_storeSmoothedReading(ADC_getCurrentSensorId(), ADC14MEM14);
+		ADC_storeReading(SENSOR_PREHEATER_TEMP, ADC14MEM12);
+		ADC_storeReading(SENSOR_INTHEATER_TEMP, ADC14MEM15);
+		ADC_storeSmoothedReading(SENSOR_SD1, ADC14MEM13);
+		ADC_storeSmoothedReading(SENSOR_SD2, ADC14MEM11);
 
-		id = SENSOR_PREHEATER_TEMP;
-		ADC_storeReading(id, smooth(ADC14MEM15, ADC_loadReading(id)));
-
-		id = SENSOR_INTHEATER_TEMP;
-		ADC_storeReading(id, smooth(ADC14MEM12, ADC_loadReading(id)));
-
-		id = SENSOR_SD1;
-		ADC_storeReading(id, smooth(ADC14MEM13, ADC_loadReading(id)));
-
-		id = SENSOR_SD2;
-		ADC_storeReading(id, smooth(ADC14MEM11, ADC_loadReading(id)));
-
-		ADC_selectNextSensor();
+		// If user has the lock (is manually selecting the sensor) than do nothing
+		if (Service_isLocked(SERVICE_LOCK_SENSOR_SELECT)) {
+			ADC_selectNextSensor();
+		}
 	}
 }
 
-Void Task_heaterPID(UArg arg0, UArg arg1) {
-	PID preheaterPID = {
-		.outMax = 301.0,
-		.outMin = 0.0,
-		.setpoint = 0.0
-	};
+/*
+ * Control Heaters Temperature
+ */
+Void Task_heaterControl(UArg arg0, UArg arg1) {
+	// Controller implements a PI controller
 
-	PID intheaterPID = {
-		.outMax = 301.0,
-		.outMin = 0.0,
-		.setpoint = 7500
-	};
+	Controller preheater;
+	Controller heater;
+	Controller_initialize(&preheater, 6900.0f);
+	Controller_initialize(&heater, 7300.0f);
 
-	PID_initialize(&preheaterPID, 10, 0, 0);
-	PID_initialize(&intheaterPID, 10, 0, 0);
-	PID_setup();
+	float temperature;
+	float output;
 
 	while (1) {
-		if (PID_getMode()) {
-			/*
-			uint16_t preTemp = ADC_loadReading(SENSOR_PREHEATER_TEMP);
-			float preOut = PID_compute(&preheaterPID, preTemp);
-			PWM_setDutyCycle(PWM_PREHEATER, preOut);
+		// Check if service is locked (user manually controlling the heaters)
+		if (Service_isLocked(SERVICE_LOCK_HEATERS)) {
+			temperature = ADC_loadReading(SENSOR_PREHEATER_TEMP);
+			output = Controller_compute(&preheater, temperature);
+			PWM_setDutyCycle(PWM_PREHEATER, output);
 
-			uint16_t intTemp = ADC_loadReading(SENSOR_INTHEATER_TEMP);
-			float intOut = PID_compute(&intheaterPID, intTemp);
-			PWM_setDutyCycle(PWM_INTHEATER, intOut);
-			*/
-
-			float error = 7500 - ADC_loadReading(SENSOR_INTHEATER_TEMP);
-			float u = error*10;
-			if (u > 301) u = 301;
-			else if (u < 0) u = 0;
-
-			PWM_setDutyCycle(PWM_INTHEATER, u);
+			temperature = ADC_loadReading(SENSOR_INTHEATER_TEMP);
+			output = Controller_compute(&heater, temperature);
+			PWM_setDutyCycle(PWM_INTHEATER, output);
 		}
+
 		Task_sleep(5000);
 	}
 }
 
+/*
+ * Read and parse RPI Services Requests from the UART:
+ * 		Read -> Parse -> Execute Service -> Compose Response (Buffer) -> Send Buffer to uartWriter
+ */
 Void Task_uartReader(UArg arg0, UArg arg1) {
 
 	Buffer buf = {
@@ -131,7 +124,7 @@ Void Task_uartReader(UArg arg0, UArg arg1) {
 	while (1) {
 		/*
 		 * Wait until a memory block is available for use.
-		 * Although this is not supposed to happen.
+		 * Although this should NEVER happen.
 		 */
 		while (buf.data == NULL) {
 			Error_Block error;
@@ -158,10 +151,13 @@ Void Task_uartReader(UArg arg0, UArg arg1) {
 		} while (buf.size == 0 || buf.size > 64);
 
 		UART0_read(buf.data, buf.size); // get payload
-		Remote_parse(&buf);
+		Service_parse(&buf);
 	}
 }
 
+/*
+ * Transmit RPI Service Requests and MSP Service responses
+ */
 Void Task_uartWriter(UArg arg0, UArg arg1) {
 	char sampleBuffer[32];
 	Buffer message;
@@ -172,15 +168,21 @@ Void Task_uartWriter(UArg arg0, UArg arg1) {
 		// Check if the event is a sample event
 		if (Sync_sampleEvent(&events)) {
 			ADC_Sample sample;
-			Sync_getSample(&sample);
+			Sync_getSample(&sample); // acquire sample object
+			
+			// compose buffer with a request to the RPI
 			message.data = sampleBuffer;
-			Service_Request_newADCSample(&message, &sample);
-			UART0_writeFrame(&message);
+			Service_Rpi_storeSample(&message, &sample);
+
+			UART0_writeFrame(&message); // transmit buffer
 		}
 
+		// Check if there is a new buffer (service packet) to be sent
 		if (Sync_bufferEvent(&events)) {
-			Sync_getBuffer(&message);
-			UART0_writeFrame(&message);
+			Sync_getBuffer(&message); // acquire buffer
+			UART0_writeFrame(&message); // transmit buffer
+
+			// freeing the buffer is our responsability
 			IHeap_Handle heap = HeapBuf_Handle_upCast(heapBuf);
 			Memory_free(heap, message.data, 64);
 		}
@@ -196,10 +198,15 @@ int main(void) {
     FPU_enableModule();
     FPU_enableLazyStacking();
 
+    // Debug leds setup
     GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN0);
     GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN0);
     GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN1);
     GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN2);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN1);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN2);
 
     PWM_setup();
     ADC_setup();
@@ -207,9 +214,9 @@ int main(void) {
 	Clock_setup();
 	Sync_setup();
 	Valves_setup();
-	Interrupt_enableMaster();
+	Service_Lock_setup();
 
-    /* Start BIOS */
+	Interrupt_enableMaster();
     BIOS_start();
     return (0);
 }

@@ -4,7 +4,7 @@
 #include <ti/drivers/UART.h>
 #include "Buffer.h"
 
-UART_Handle uart0;
+static UART_Handle uart0;
 
 void UART0_setup() {
 
@@ -30,6 +30,7 @@ void UART0_read(void* buf, size_t size) {
 	UART_read(uart0, buf, size);
 }
 
+// Writes packet frame to the wire
 void UART0_writeFrame(Buffer* buf) {
 	char startOfPacket = '!';
 	UART0_write(&startOfPacket, 1);
