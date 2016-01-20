@@ -56,7 +56,7 @@ void ADC_storeReading(ADC_Sensor_Id id, uint16_t value) {
 }
 
 float smooth(uint16_t current, uint16_t past) {
-	return 0.05f*current + 0.95f*past;
+	return 0.01f*current + 0.99f*past;
 }
 
 void ADC_storeSmoothedReading(ADC_Sensor_Id id, uint16_t value) {

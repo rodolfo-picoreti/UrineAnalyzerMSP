@@ -68,8 +68,8 @@ Void ADC_hwi() {
 
 	if (ADC_INT15 & status) {
 		ADC_storeSmoothedReading(ADC_getCurrentSensorId(), ADC14MEM14);
-		ADC_storeReading(SENSOR_PREHEATER_TEMP, ADC14MEM12);
-		ADC_storeReading(SENSOR_INTHEATER_TEMP, ADC14MEM15);
+		ADC_storeSmoothedReading(SENSOR_PREHEATER_TEMP, ADC14MEM12);
+		ADC_storeSmoothedReading(SENSOR_INTHEATER_TEMP, ADC14MEM15);
 		ADC_storeSmoothedReading(SENSOR_SD1, ADC14MEM13);
 		ADC_storeSmoothedReading(SENSOR_SD2, ADC14MEM11);
 
