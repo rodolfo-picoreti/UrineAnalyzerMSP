@@ -15,10 +15,10 @@ void Service_Msp_parse(Buffer* packet) {
 		case SERVICE_MSP_CONFIG_LOCKS:
 			Service_Msp_configureLocks(packet); break;
 	
-		case SERVICE_MSP_START_SAMPLING:
+		case SERVICE_MSP_START_SAMPLING: 
 			Service_Msp_startSampling(packet); break;
 
-		case SERVICE_MSP_STOP_SAMPLING:
+		case SERVICE_MSP_STOP_SAMPLING: 
 			Service_Msp_stopSampling(packet); break;
 
 		case SERVICE_MSP_SELECT_SENSOR:

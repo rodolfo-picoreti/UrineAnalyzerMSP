@@ -4,7 +4,7 @@
 // RPI Service Ids
 
 typedef enum {
-	SERVICE_RPI_STORE_SAMPLE = 0x00
+	SERVICE_RPI_STORE_SAMPLE = 0x00 
 } Service_Rpi;
 
 size_t Service_Rpi_serialize(char* buffer, Service_Rpi service) {

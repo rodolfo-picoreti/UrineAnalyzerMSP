@@ -189,6 +189,9 @@ Void Task_uartWriter(UArg arg0, UArg arg1) {
 	}
 }
 
+Void Task_machineState(UArg arg0, UArg arg1) {
+
+}
 
 int main(void) {
     Board_initGeneral();
